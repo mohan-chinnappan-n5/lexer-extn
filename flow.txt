@@ -1,0 +1,16 @@
+Flow of EPT Value
+Content Script (content.js):
+Retrieves EPT via getSalesforceEPT using $A.metricsService.
+
+Sends it to popup.js via sendResponse({ components: components, ept: ept }).
+
+Popup Script (popup.js):
+Receives EPT in the chrome.tabs.sendMessage callback.
+
+Stores it in eptValue and passes it to displayComponents.
+
+Updates #eptValue with the value.
+
+Popup HTML (popup.html):
+Displays the EPT in the <span id="eptValue"> within the summary section.
+
