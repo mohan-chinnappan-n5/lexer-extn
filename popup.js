@@ -1,8 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
-    let eptValue = null; 
     let allComponents = [];
-    let sortBy = 'name'; // Default sort by name
-    let sortOrder = 'asc'; // Default ascending
+    let sortBy = 'name';
+    let sortOrder = 'asc';
+    let eptValue = null;
+    let perfValue = null;
 
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const tab = tabs[0];
@@ -31,7 +32,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         return;
                     }
 
-
                     if (response) {
                         if (response.error) {
                             document.getElementById('componentList').innerHTML = 
@@ -39,11 +39,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         } else if (response.components) {
                             allComponents = response.components;
                             eptValue = response.ept;
+                            perfValue = response.perf;
                             console.log('EPT:', eptValue);
-
-                            // displayComponents(allComponents, '', sortBy, sortOrder);
-                            displayComponents(allComponents, '', sortBy, sortBy, eptValue);
-
+                            console.log('Perf:', perfValue);
+                            displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
                         } else {
                             document.getElementById('componentList').innerHTML = 
                                 'No Lightning components found.';
@@ -60,55 +59,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Search functionality
     const searchInput = document.getElementById('searchInput');
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
-        // displayComponents(allComponents, searchTerm, sortBy, sortOrder);
-        displayComponents(allComponents, searchTerm, sortBy, sortOrder, eptValue);
-
+        displayComponents(allComponents, searchTerm, sortBy, sortOrder, eptValue, perfValue);
     });
 });
 
-function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrder = 'asc') {
+function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrder = 'asc', ept = null, perf = null) {
     const container = document.getElementById('componentList');
     container.innerHTML = '';
 
-    // Filter components based on search term
     const filteredComponents = components.filter(component => 
         component.name.toLowerCase().includes(searchTerm)
     );
 
-    // Sort components
     filteredComponents.sort((a, b) => {
         if (sortBy === 'name') {
             const nameA = a.name.toLowerCase();
             const nameB = b.name.toLowerCase();
             return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+        } else if (sortBy === 'id') {
+            const idA = a.instances[0]?.id || '';
+            const idB = b.instances[0]?.id || '';
+            return sortOrder === 'asc' ? idA.localeCompare(idB) : idB.localeCompare(idA);
         } else if (sortBy === 'count') {
             return sortOrder === 'asc' ? a.count - b.count : b.count - a.count;
         }
         return 0;
     });
 
-    // Calculate counts
-    const uniqueCount = components.length;
-    const totalCount = components.reduce((sum, comp) => sum + comp.count, 0);
-    document.getElementById('uniqueCount').textContent = uniqueCount;
-    document.getElementById('totalCount').textContent = totalCount;
+    document.getElementById('uniqueCount').textContent = components.length;
+    document.getElementById('totalCount').textContent = components.reduce((sum, comp) => sum + comp.count, 0);
+    document.getElementById('eptValue').textContent = ept !== null && !isNaN(ept) ? ept.toFixed(2) : 'N/A';
+    document.getElementById('perfValue').textContent = perf !== null && !isNaN(perf) ? perf.toFixed(2) : 'N/A';
 
-    // Add grid header with clickable sort buttons
+    // Header with sort indicators
     const header = document.createElement('div');
-    header.className = 'grid grid-cols-2 gap-2 bg-gray-200 p-2 rounded font-semibold text-gray-700';
+    header.className = 'grid grid-cols-3 gap-2 bg-gray-200 p-3 rounded-lg font-semibold text-gray-700 cursor-pointer';
     header.innerHTML = `
-        <div class="cursor-pointer" id="sortName">
-            Component Name 
-            <span>${sortBy === 'name' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span>
-        </div>
-        <div class="text-center cursor-pointer" id="sortCount">
-            Count 
-            <span>${sortBy === 'count' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span>
-        </div>
+        <div id="sortName">Component Name <span class="inline-block ml-1">${sortBy === 'name' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
+        <div id="sortId" class="text-center">Id <span class="inline-block">${sortBy === 'id' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
+        <div id="sortCount" class="text-center">Count <span class="inline-block">${sortBy === 'count' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
     `;
     container.appendChild(header);
 
@@ -116,27 +108,33 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
     header.querySelector('#sortName').addEventListener('click', () => {
         sortBy = 'name';
         sortOrder = (sortBy === 'name' && sortOrder === 'asc') ? 'desc' : 'asc';
-        displayComponents(components, searchTerm, sortBy, sortOrder);
+        displayComponents(components, searchTerm, sortBy, sortOrder, ept, perf);
+    });
+    header.querySelector('#sortId').addEventListener('click', () => {
+        sortBy = 'id';
+        sortOrder = (sortBy === 'id' && sortOrder === 'asc') ? 'desc' : 'asc';
+        displayComponents(components, searchTerm, sortBy, sortOrder, ept, perf);
     });
     header.querySelector('#sortCount').addEventListener('click', () => {
         sortBy = 'count';
         sortOrder = (sortBy === 'count' && sortOrder === 'asc') ? 'desc' : 'asc';
-        displayComponents(components, searchTerm, sortBy, sortOrder);
+        displayComponents(components, searchTerm, sortBy, sortOrder, ept, perf);
     });
 
     // Add filtered components
     filteredComponents.forEach(component => {
         const div = document.createElement('div');
-        div.className = 'grid grid-cols-2 gap-2 bg-white p-2 rounded shadow';
+        div.className = 'grid grid-cols-3 gap-2 bg-white p-3 rounded-lg shadow-md hover:bg-gray-50 transition-colors';
         div.innerHTML = `
-            <div>
+            <div class="truncate">
                 <span class="font-bold text-blue-600">${component.name}</span>
                 ${component.children.size > 0 ? `
-                    <div class="ml-4 text-sm text-gray-600">
+                    <div class="ml-2 text-sm text-gray-600">
                         Children: ${Array.from(component.children).join(', ')}
                     </div>
                 ` : ''}
             </div>
+            <div class="text-center text-gray-700 truncate">${component.instances[0]?.id || 'N/A'}</div>
             <div class="text-center text-gray-700">${component.count}</div>
         `;
         container.appendChild(div);
@@ -144,6 +142,6 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
 
     // If no results
     if (filteredComponents.length === 0 && searchTerm) {
-        container.innerHTML += '<p class="text-gray-600 text-center">No components match your search.</p>';
+        container.innerHTML += '<p class="text-gray-600 text-center py-2">No components match your search.</p>';
     }
 }

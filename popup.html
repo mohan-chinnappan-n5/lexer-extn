@@ -6,39 +6,51 @@
     <link rel="stylesheet" href="https://unpkg.com/tailwindcss@^2/dist/tailwind.min.css">
     <style>
         body {
-            width: 400px;
+            width: 600px;
             font-family: Arial, sans-serif;
-            height: 500px; /* Optional: Set a fixed height for the popup */
+            height: 700px;
         }
         #stickyHeader {
             position: sticky;
             top: 0;
-            z-index: 10; /* Ensure it stays above scrolling content */
-            background-color: inherit; /* Match body bg */
+            z-index: 10;
+            background-color: inherit;
         }
         #componentList {
-            max-height: calc(500px - 12rem); /* Adjust based on header height */
-            overflow-y: auto; /* Enable scrolling */
+            max-height: calc(700px - 14rem);
+            overflow-y: auto;
         }
     </style>
 </head>
-<body class="p-4 bg-gray-100">
+<body class="p-4 bg-gray-50">
     <div id="stickyHeader" class="space-y-4">
-        <h2 class="text-xl font-bold text-blue-600">Lightning Components</h2>
-        <div id="summary" class="p-2 bg-white rounded shadow">
-            <p class="text-sm text-gray-700">Unique Components: <span id="uniqueCount" class="font-semibold">0</span></p>
-            <p class="text-sm text-gray-700">Total Instances: <span id="totalCount" class="font-semibold">0</span></p>
-            <p class="text-sm text-gray-700">Page Load Time: <span id="eptValue" class="font-semibold">N/A</span> ms</p>
-
+        <h2 class="text-2xl font-bold text-blue-600">Lightning Components Analyzer</h2>
+        <div id="summary" class="p-4 bg-white rounded-lg shadow-md">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <p class="text-sm text-gray-700">Unique Components: <span id="uniqueCount" class="font-semibold text-blue-600">0</span></p>
+                    <p class="text-sm text-gray-700">Total Instances: <span id="totalCount" class="font-semibold text-blue-600">0</span></p>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-700">EPT (SF): <span id="eptValue" class="font-semibold text-blue-600">N/A</span> ms</p>
+                    <p class="text-sm text-gray-700">Load Time: <span id="perfValue" class="font-semibold text-blue-600">N/A</span> ms</p>
+                </div>
+            </div>
         </div>
         <input 
             type="text" 
             id="searchInput" 
             placeholder="Search components..." 
-            class="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
         >
     </div>
-    <div id="componentList" class="space-y-2 mt-4"></div>
+    <div id="componentList" class="space-y-2 mt-4">
+        <div class="grid grid-cols-3 gap-2 bg-gray-200 p-3 rounded-lg font-semibold text-gray-700 cursor-pointer">
+            <div id="sortName">Component Name <span class="inline-block ml-1">${sortBy === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
+            <div id="sortId" class="text-center">Id <span class="inline-block">${sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
+            <div id="sortCount" class="text-center">Count <span class="inline-block">${sortBy === 'count' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
+        </div>
+    </div>
     <script src="popup.js"></script>
 </body>
 </html>
