@@ -1,10 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
-    let allComponents = [];
+    let allComponents = []; // Array to store all components
     let sortBy = 'name';
     let sortOrder = 'asc';
     let eptValue = null;
     let perfValue = null;
 
+    // Get the active tab
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const tab = tabs[0];
         if (!tab) {
@@ -12,7 +13,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        // Check if the tab is a Salesforce page
         if (tab.url.includes('.force.com') || tab.url.includes('.salesforce.com')) {
+            // Inject the content script
             chrome.scripting.executeScript({
                 target: { tabId: tab.id },
                 files: ['content.js']
@@ -23,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Error injecting content script: ' + chrome.runtime.lastError.message;
                     return;
                 }
-
+                // Send a message to the content script to get the components
                 chrome.tabs.sendMessage(tab.id, { action: "getComponents" }, (response) => {
                     if (chrome.runtime.lastError) {
                         console.error(chrome.runtime.lastError.message);
@@ -38,10 +41,34 @@ document.addEventListener('DOMContentLoaded', () => {
                                 'Error: ' + response.error;
                         } else if (response.components) {
                             allComponents = response.components;
-                            eptValue = response.ept;
                             perfValue = response.perf;
-                            console.log('EPT:', eptValue);
+                            console.log('response', response);
+                            console.log('Components:', allComponents);
                             console.log('Perf:', perfValue);
+
+                            // Inject getEPT.js to retrieve EPT if not already present
+                            chrome.scripting.executeScript({
+                                target: { tabId: tab.id },
+                                files: ['getEPT.js']
+                            }, () => {
+                                if (chrome.runtime.lastError) {
+                                    console.error('Error injecting getEPT.js:', chrome.runtime.lastError.message);
+                                    eptValue = null;
+                                    displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
+                                } else {
+                                    // Listen for EPT from content.js
+                                    const eptListener = (message, sender, sendResponse) => {
+                                        if (message.action === 'setEPT' && sender.tab?.id === tab.id) {
+                                            eptValue = message.ept;
+                                            console.log('Updated EPT:', eptValue);
+                                            displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
+                                            sendResponse({ success: true });
+                                            chrome.runtime.onMessage.removeListener(eptListener); // Clean up listener
+                                        }
+                                    };
+                                    chrome.runtime.onMessage.addListener(eptListener);
+                                }
+                            });
                             displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
                         } else {
                             document.getElementById('componentList').innerHTML = 
@@ -60,6 +87,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     const searchInput = document.getElementById('searchInput');
+    // Add input event listener for search input
     searchInput.addEventListener('input', (e) => {
         const searchTerm = e.target.value.toLowerCase();
         displayComponents(allComponents, searchTerm, sortBy, sortOrder, eptValue, perfValue);
@@ -70,11 +98,12 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
     const container = document.getElementById('componentList');
     container.innerHTML = '';
 
+    // Filter components based on search term
     const filteredComponents = components.filter(component => 
-        component.name.toLowerCase().includes(searchTerm)
+        component.name.toLowerCase().includes(searchTerm) // Search by component name
     );
 
-    filteredComponents.sort((a, b) => {
+    filteredComponents.sort((a, b) => { // Sort the components
         if (sortBy === 'name') {
             const nameA = a.name.toLowerCase();
             const nameB = b.name.toLowerCase();
@@ -102,10 +131,10 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
     const header = document.createElement('div');
     header.className = 'grid grid-cols-4 gap-2 bg-gray-200 p-3 rounded-lg font-semibold text-gray-700 cursor-pointer';
     header.innerHTML = `
-        <div id="sortName">Component Name <span class="inline-block ml-1">${sortBy === 'name' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
-        <div id="sortId" class="text-center">Id <span class="inline-block">${sortBy === 'id' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
-        <div id="sortDataComponentId" class="text-center">Data Component Id <span class="inline-block">${sortBy === 'dataComponentId' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
-        <div id="sortCount" class="text-center">Count <span class="inline-block">${sortBy === 'count' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
+        <div id="sortName">Component Name <span class="inline-block ml-1">${sortBy === 'name' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
+        <div id="sortId" class="text-center">Id <span class="inline-block">${sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
+        <div id="sortDataComponentId" class="text-center">Data Component Id <span class="inline-block">${sortBy === 'dataComponentId' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
+        <div id="sortCount" class="text-center">Count <span class="inline-block">${sortBy === 'count' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}</span></div>
     `;
     container.appendChild(header);
 
@@ -158,9 +187,16 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
         name.addEventListener('click', () => {
             const componentName = name.getAttribute('data-component');
             chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                // Send a message to the content script to highlight the component
                 chrome.tabs.sendMessage(tabs[0].id, { action: "highlightComponent", componentName: componentName }, (response) => {
                     if (chrome.runtime.lastError) {
+                        // Log the error message
+                        alert('Error highlighting component: ' + chrome.runtime.lastError.message);
                         console.error('Error highlighting component:', chrome.runtime.lastError.message);
+                    } else {
+                        // Log the response
+                        console.log('Component highlighted:', response);
+                        console.log('response: ' + JSON.stringify(response));
                     }
                 });
             });

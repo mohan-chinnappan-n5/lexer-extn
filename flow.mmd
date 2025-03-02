@@ -1,0 +1,40 @@
+graph TD
+    A[popup.js] -->|"Click Extension Icon"| B[background.js]
+    B -->|"Open New Tab"| C[popup.html]
+    C -->|"Load"| A
+
+    A -->|"chrome.tabs.sendMessage getComponents"| D[content.js]
+    D -->|"Detect Components - detectLightningComponents"| E[Components Data]
+    D -->|"Get Salesforce EPT - getSalesforceEPT"| F[EPT Value]
+    D -->|"Get Performance - getPagePerformance"| G[Performance Value]
+    D -->|"Send Response {components, ept, perf}"| A
+
+    A -->|"Display Components - displayComponents"| H[UI Update]
+    H -->|"Search/Sort Click"| A
+
+    A -->|"Click Component Name - chrome.tabs.sendMessage highlightComponent"| D
+    D -->|"Highlight Component - highlightComponent"| I[Highlighted Element on Page]
+
+    subgraph Popup
+        A
+        H
+    end
+
+    subgraph "Content Script"
+        D
+        E
+        F
+        G
+        I
+    end
+
+    %% Apply styles
+    style A fill:#f4a261,stroke:#333,stroke-width:2px
+    style B fill:#e76f51,stroke:#333,stroke-width:2px
+    style C fill:#f4a261,stroke:#333,stroke-width:2px
+    style D fill:#2a9d8f,stroke:#333,stroke-width:2px
+    style E fill:#8ab17d,stroke:#333,stroke-width:2px
+    style F fill:#8ab17d,stroke:#333,stroke-width:2px
+    style G fill:#8ab17d,stroke:#333,stroke-width:2px
+    style H fill:#264653,stroke:#fff,stroke-width:2px,color:#fff
+    style I fill:#2a9d8f,stroke:#333,stroke-width:2px
