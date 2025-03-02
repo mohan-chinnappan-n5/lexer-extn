@@ -46,29 +46,70 @@ document.addEventListener('DOMContentLoaded', () => {
                             console.log('Components:', allComponents);
                             console.log('Perf:', perfValue);
 
-                            // Inject getEPT.js to retrieve EPT if not already present
-                            chrome.scripting.executeScript({
-                                target: { tabId: tab.id },
-                                files: ['getEPT.js']
-                            }, () => {
-                                if (chrome.runtime.lastError) {
-                                    console.error('Error injecting getEPT.js:', chrome.runtime.lastError.message);
-                                    eptValue = null;
-                                    displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
-                                } else {
-                                    // Listen for EPT from content.js
-                                    const eptListener = (message, sender, sendResponse) => {
-                                        if (message.action === 'setEPT' && sender.tab?.id === tab.id) {
-                                            eptValue = message.ept;
-                                            console.log('Updated EPT:', eptValue);
-                                            displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
-                                            sendResponse({ success: true });
-                                            chrome.runtime.onMessage.removeListener(eptListener); // Clean up listener
+                            // Inject getEPT.js and wait for $A
+                            function waitForAura(callback, retries = 10, interval = 500) {
+                                const checkAura = () => {
+                                    chrome.scripting.executeScript({
+                                        target: { tabId: tab.id },
+                                        func: () => {
+                                            if (window.$A && $A.metricsService) {
+                                                return true;
+                                            }
+                                            return false;
                                         }
-                                    };
-                                    chrome.runtime.onMessage.addListener(eptListener);
+                                    }, (results) => {
+                                        if (chrome.runtime.lastError) {
+                                            console.error('Error checking $A:', chrome.runtime.lastError.message);
+                                            if (retries > 0) {
+                                                retries--;
+                                                setTimeout(checkAura, interval);
+                                            } else {
+                                                callback(null, '$A.metricsService not available after retries');
+                                            }
+                                        } else if (results && results[0].result) {
+                                            callback();
+                                        } else if (retries > 0) {
+                                            retries--;
+                                            setTimeout(checkAura, interval);
+                                        } else {
+                                            callback(null, '$A.metricsService not available after retries');
+                                        }
+                                    });
+                                };
+                                checkAura();
+                            }
+
+                            waitForAura(() => {
+                                chrome.scripting.executeScript({
+                                    target: { tabId: tab.id },
+                                    files: ['getEPT.js']
+                                }, () => {
+                                    if (chrome.runtime.lastError) {
+                                        console.error('Error injecting getEPT.js:', chrome.runtime.lastError.message);
+                                        eptValue = null;
+                                    } else {
+                                        console.log('getEPT.js injected successfully');
+                                    }
+                                });
+                            }, (ept, error) => {
+                                if (error) {
+                                    eptValue = null;
+                                    console.error('EPT Error:', error);
                                 }
                             });
+
+                            // Listen for EPT from content.js
+                            const eptListener = (message, sender, sendResponse) => {
+                                if (message.action === 'setEPT' && sender.tab?.id === tab.id) {
+                                    eptValue = message.ept;
+                                    console.log('Updated EPT:', eptValue);
+                                    displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
+                                    sendResponse({ success: true });
+                                    chrome.runtime.onMessage.removeListener(eptListener); // Clean up listener
+                                }
+                            };
+                            chrome.runtime.onMessage.addListener(eptListener);
+
                             displayComponents(allComponents, '', sortBy, sortOrder, eptValue, perfValue);
                         } else {
                             document.getElementById('componentList').innerHTML = 
