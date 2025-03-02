@@ -83,6 +83,10 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
             const idA = a.instances[0]?.id || '';
             const idB = b.instances[0]?.id || '';
             return sortOrder === 'asc' ? idA.localeCompare(idB) : idB.localeCompare(idA);
+        } else if (sortBy === 'dataComponentId') {
+            const dataIdA = a.instances[0]?.dataComponentId || '';
+            const dataIdB = b.instances[0]?.dataComponentId || '';
+            return sortOrder === 'asc' ? dataIdA.localeCompare(dataIdB) : dataIdB.localeCompare(dataIdA);
         } else if (sortBy === 'count') {
             return sortOrder === 'asc' ? a.count - b.count : b.count - a.count;
         }
@@ -96,10 +100,11 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
 
     // Header with sort indicators
     const header = document.createElement('div');
-    header.className = 'grid grid-cols-3 gap-2 bg-gray-200 p-3 rounded-lg font-semibold text-gray-700 cursor-pointer';
+    header.className = 'grid grid-cols-4 gap-2 bg-gray-200 p-3 rounded-lg font-semibold text-gray-700 cursor-pointer';
     header.innerHTML = `
         <div id="sortName">Component Name <span class="inline-block ml-1">${sortBy === 'name' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
         <div id="sortId" class="text-center">Id <span class="inline-block">${sortBy === 'id' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
+        <div id="sortDataComponentId" class="text-center">Data Component Id <span class="inline-block">${sortBy === 'dataComponentId' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
         <div id="sortCount" class="text-center">Count <span class="inline-block">${sortBy === 'count' ? (sortOrder === 'asc' ? '&uarr;' : '&darr;') : ''}</span></div>
     `;
     container.appendChild(header);
@@ -115,19 +120,25 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
         sortOrder = (sortBy === 'id' && sortOrder === 'asc') ? 'desc' : 'asc';
         displayComponents(components, searchTerm, sortBy, sortOrder, ept, perf);
     });
+    header.querySelector('#sortDataComponentId').addEventListener('click', () => {
+        sortBy = 'dataComponentId';
+        sortOrder = (sortBy === 'dataComponentId' && sortOrder === 'asc') ? 'desc' : 'asc';
+        displayComponents(components, searchTerm, sortBy, sortOrder, ept, perf);
+    });
     header.querySelector('#sortCount').addEventListener('click', () => {
         sortBy = 'count';
         sortOrder = (sortBy === 'count' && sortOrder === 'asc') ? 'desc' : 'asc';
         displayComponents(components, searchTerm, sortBy, sortOrder, ept, perf);
     });
 
-    // Add filtered components
+    // Add filtered components with LWC highlight
     filteredComponents.forEach(component => {
         const div = document.createElement('div');
-        div.className = 'grid grid-cols-3 gap-2 bg-white p-3 rounded-lg shadow-md hover:bg-gray-50 transition-colors';
+        div.className = 'grid grid-cols-4 gap-2 bg-white p-3 rounded-lg shadow-md hover:bg-gray-50 transition-colors';
         div.innerHTML = `
             <div class="truncate">
-                <span class="font-bold text-blue-600">${component.name}</span>
+                <span class="font-bold ${component.isLwc ? 'text-green-600' : 'text-blue-600'} cursor-pointer" data-component="${component.name}">${component.name}</span>
+                ${typeof component.isLwc !== 'undefined' && component.isLwc ? '<span class="ml-2 inline-block px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">LWC</span>' : ''}
                 ${component.children.size > 0 ? `
                     <div class="ml-2 text-sm text-gray-600">
                         Children: ${Array.from(component.children).join(', ')}
@@ -135,9 +146,25 @@ function displayComponents(components, searchTerm = '', sortBy = 'name', sortOrd
                 ` : ''}
             </div>
             <div class="text-center text-gray-700 truncate">${component.instances[0]?.id || 'N/A'}</div>
+            <div class="text-center text-gray-700 truncate">${component.instances[0]?.dataComponentId || 'N/A'}</div>
             <div class="text-center text-gray-700">${component.count}</div>
         `;
         container.appendChild(div);
+    });
+
+    // Add click event listener for component names after adding components
+    const componentNames = container.querySelectorAll('.font-bold.text-blue-600, .font-bold.text-green-600');
+    componentNames.forEach(name => {
+        name.addEventListener('click', () => {
+            const componentName = name.getAttribute('data-component');
+            chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+                chrome.tabs.sendMessage(tabs[0].id, { action: "highlightComponent", componentName: componentName }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.error('Error highlighting component:', chrome.runtime.lastError.message);
+                    }
+                });
+            });
+        });
     });
 
     // If no results

@@ -27,6 +27,12 @@ function detectLightningComponents() {
             attr.name.startsWith('lightning-') // Check if attribute name starts with 'lightning-'
         );
     }
+     // Function to check if an element has lwc-* attributes
+   function hasLwcAttribute(element) {
+       return Array.from(element.attributes).some(attr => 
+           attr.name.startsWith('lwc-')
+       );
+   }
 
     // Process aura elements
     auraElements.forEach(element => {
@@ -61,7 +67,8 @@ function detectLightningComponents() {
     const allElements = document.getElementsByTagName('*'); // Get all elements in the document
     Array.from(allElements).forEach(element => {
         const tagName = element.tagName.toLowerCase();
-        if (hasLightningAttribute(element) && !element.hasAttribute('data-aura-class')) {
+        if ((hasLightningAttribute(element) || hasLwcAttribute(element)) && !element.hasAttribute('data-aura-class')) {
+
             const componentName = tagName || 'Unknown Component';
             const parentId = element.closest('[data-aura-rendered-by]')?.getAttribute('data-aura-rendered-by') || 'root';
             
@@ -72,7 +79,7 @@ function detectLightningComponents() {
                         name: componentName,
                         count: 0,
                         instances: [],
-                        children: new Set()
+                        children: new Set(),
                     });
                 }
                 
@@ -80,7 +87,9 @@ function detectLightningComponents() {
                 component.count++;
                 component.instances.push({
                     id: element.id || `instance-${component.count}`,
-                    parentId: parentId
+                    parentId: parentId,
+                    dataComponentId: element.getAttribute('data-component-id') || null // Add data-component-id
+
                 });
             }
         }
@@ -115,7 +124,19 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => { // Add
                     console.error('EPT Error:', error);
                 }
                 console.log('EPT:', ept);
-                sendResponse({ components: components, ept: ept, perf: perf }); //
+                // sendResponse({ components: components, ept: ept, perf: perf }); //
+                sendResponse({ 
+                                       components: components.map(comp => ({
+                                           ...comp,
+                                           instances: comp.instances.map(instance => ({
+                                               ...instance,
+                                               dataComponentId: instance.dataComponentId || null
+                                           }))
+                                       })), 
+                                       ept: ept, 
+                                       perf: perf 
+                                   });
+
 
             });
         } catch (error) {
